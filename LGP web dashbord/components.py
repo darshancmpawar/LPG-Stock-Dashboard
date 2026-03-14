@@ -416,7 +416,7 @@ def build_city_pivot_table(
                         className="pivot-search-wrap",
                         children=[
                             dcc.Input(
-                                id="pivot-search-input",
+                                id={"type": "pivot-search-input", "index": "main"},
                                 value=search_text,
                                 type="text",
                                 placeholder="Search client or vendor",

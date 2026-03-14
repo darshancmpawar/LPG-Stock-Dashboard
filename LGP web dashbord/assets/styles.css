@@ -371,7 +371,7 @@ button {
 }
 
 .region-card {
-  padding: 16px;
+  padding: 20px;
   border: 1px solid var(--border-mid);
   border-radius: 16px;
   background: var(--bg-card);
@@ -391,7 +391,7 @@ button {
 
 .region-card-title {
   color: var(--text-strong);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   line-height: 1;
 }
@@ -404,10 +404,15 @@ button {
 
 .region-card-risk-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 16px;
+}
+
+.region-card-risk-row .count-dot-wrap {
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------
