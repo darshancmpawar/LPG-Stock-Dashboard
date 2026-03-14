@@ -19,106 +19,25 @@ Design goals:
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Any
 
 import pandas as pd
 
-
-RISK_COLORS = {
-    "Out of Stock": "#ef4444",
-    "Critical": "#f97316",
-    "Moderate": "#eab308",
-    "Safe": "#22c55e",
-}
-
-RISK_LEVELS = {
-    "Safe": 1,
-    "Moderate": 2,
-    "Critical": 3,
-    "Out of Stock": 4,
-}
-
-RISK_DISPLAY_ORDER = [
-    "Out of Stock",
-    "Critical",
-    "Moderate",
-    "Safe",
-]
+from stock_logic import (
+    RISK_COLORS,
+    RISK_LEVELS,
+    as_date,
+    get_live_days,
+    get_risk_category,
+    risk_sort_key,
+    working_days_between,
+)
 
 
 # -------------------------------------------------------------------
 # Internal helpers
 # -------------------------------------------------------------------
-def _as_date(value: Any) -> date | None:
-    """Safely convert incoming values to date."""
-    if value is None or pd.isna(value):
-        return None
-
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-
-    if isinstance(value, datetime):
-        return value.date()
-
-    parsed = pd.to_datetime(value, errors="coerce")
-    if pd.isna(parsed):
-        return None
-    return parsed.date()
-
-
-
-def _is_weekend(d: date) -> bool:
-    return d.weekday() >= 5  # Saturday=5, Sunday=6
-
-
-
-def _working_days_between(last_updated: date, selected_date: date) -> int:
-    """
-    Count weekdays between:
-    - last_updated date exclusive
-    - selected_date exclusive
-
-    This matches the user's dashboard logic.
-    """
-    if selected_date <= last_updated:
-        return 0
-
-    cursor = pd.Timestamp(last_updated) + pd.Timedelta(days=1)
-    end = pd.Timestamp(selected_date)
-    count = 0
-
-    while cursor < end:
-        if not _is_weekend(cursor.date()):
-            count += 1
-        cursor += pd.Timedelta(days=1)
-
-    return count
-
-
-
-def _get_live_days(days_of_stock: float | int, last_updated: date, selected_date: date) -> int:
-    consumed = _working_days_between(last_updated, selected_date)
-    return max(0, int(days_of_stock) - consumed)
-
-
-
-def _get_risk_category(live_days: int) -> str:
-    if live_days == 0:
-        return "Out of Stock"
-    if live_days <= 2:
-        return "Critical"
-    if live_days <= 4:
-        return "Moderate"
-    return "Safe"
-
-
-
-def _risk_sort_key(risk: str) -> int:
-    return RISK_DISPLAY_ORDER.index(risk) if risk in RISK_DISPLAY_ORDER else 999
-
-
-
 def _count_by_risk(rows: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "out": sum(1 for row in rows if row.get("risk") == "Out of Stock"),
@@ -183,13 +102,13 @@ def enrich_dashboard_rows(df: pd.DataFrame, selected_date: date) -> list[dict[st
     rows: list[dict[str, Any]] = []
 
     for idx, row in df.reset_index(drop=True).iterrows():
-        last_updated = _as_date(row.get("last_updated"))
+        last_updated = as_date(row.get("last_updated"))
         if last_updated is None:
             continue
 
         days_of_stock = int(float(row.get("days_of_stock", 0) or 0))
-        live_days = _get_live_days(days_of_stock, last_updated, selected_date)
-        risk = _get_risk_category(live_days)
+        live_days = get_live_days(days_of_stock, last_updated, selected_date)
+        risk = get_risk_category(live_days)
 
         rows.append(
             {
@@ -202,7 +121,7 @@ def enrich_dashboard_rows(df: pd.DataFrame, selected_date: date) -> list[dict[st
                 "last_updated": last_updated.isoformat(),
                 "continuity": str(row.get("continuity", "")).strip(),
                 "gail_png": str(row.get("gail_png", "")).strip(),
-                "working_days_consumed": _working_days_between(last_updated, selected_date),
+                "working_days_consumed": working_days_between(last_updated, selected_date),
                 "live_days": live_days,
                 "risk": risk,
                 "risk_level": RISK_LEVELS[risk],
@@ -354,7 +273,7 @@ def build_client_pivot_groups(
     filtered.sort(
         key=lambda row: (
             str(row.get("client", "")),
-            _risk_sort_key(str(row.get("risk", "Safe"))),
+            risk_sort_key(str(row.get("risk", "Safe"))),
             str(row.get("vendor", "")),
         )
     )
