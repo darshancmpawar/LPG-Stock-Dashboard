@@ -309,11 +309,13 @@ def select_risk_category(
 # -----------------------------
 @callback(
     Output("store-search-text", "data"),
-    Input("pivot-search-input", "value"),
+    Input({"type": "pivot-search-input", "index": dash.ALL}, "value"),
     prevent_initial_call=True,
 )
-def sync_search_text(search_text: str | None) -> str:
-    return (search_text or "").strip()
+def sync_search_text(search_values: list[str | None]) -> str:
+    if not search_values:
+        return ""
+    return str(search_values[-1] or "").strip()
 
 
 # -----------------------------
