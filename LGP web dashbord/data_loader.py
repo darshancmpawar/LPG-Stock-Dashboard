@@ -34,6 +34,9 @@ from config import (
     EXCLUDE_GAIL_PNG_YES,
     VENDOR_SHEET_NAME,
 )
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 # -------------------------------------------------------------------
@@ -63,10 +66,13 @@ CLIENT_EXACT_COLUMNS = {
 def load_raw_workbook(file_path: str | Path = DATA_FILE_PATH) -> tuple[pd.DataFrame, pd.DataFrame]:
     path = Path(file_path)
     if not path.exists():
+        logger.error("Dataset file not found: %s", path)
         raise FileNotFoundError(f"Dataset file not found: {path}")
 
+    logger.info("Loading workbook from %s", path)
     vendor_df = pd.read_excel(path, sheet_name=VENDOR_SHEET_NAME)
     client_df = pd.read_excel(path, sheet_name=CLIENT_SHEET_NAME)
+    logger.info("Workbook loaded: vendor rows=%s, client rows=%s", len(vendor_df), len(client_df))
 
     return vendor_df, client_df
 
@@ -235,6 +241,7 @@ def load_dashboard_data(file_path: str | Path = DATA_FILE_PATH) -> pd.DataFrame:
     vendor_df = filter_out_gail_png_yes(vendor_df)
 
     merged_df = merge_client_vendor_data(client_df, vendor_df)
+    logger.info("Dashboard data prepared with %s merged rows", len(merged_df))
     return merged_df
 
 

@@ -27,7 +27,7 @@ from datetime import date
 from typing import Any
 
 import dash
-from dash import Dash, Input, Output, State, callback, dcc, html, no_update
+from dash import Dash, Input, Output, State, callback, dcc, html
 from dash.exceptions import PreventUpdate
 
 # These modules will be created next.
@@ -51,12 +51,14 @@ from components import (
     build_section_tabs,
 )
 from data_loader import load_dashboard_data
+from logger import setup_logger
 
 
 DEFAULT_SELECTED_DATE = date(2026, 3, 17)
 DEFAULT_RISK = ""
 APP_TITLE = "LPG Stock Tacker Dashboard"
 
+logger = setup_logger(__name__)
 
 app: Dash = Dash(
     __name__,
@@ -68,6 +70,7 @@ server = app.server
 
 # Load once at startup. Later we can switch this to a cached loader if needed.
 RAW_DF = load_dashboard_data()
+logger.info("Dashboard dataset loaded at startup with %s rows", len(RAW_DF))
 
 
 # -----------------------------
@@ -77,12 +80,6 @@ def get_city_options(enriched_rows: list[dict[str, Any]]) -> list[str]:
     """Return sorted city/region options from enriched rows."""
     cities = {str(row["region"]).strip() for row in enriched_rows if row.get("region")}
     return sorted(cities)
-
-
-def first_city(enriched_rows: list[dict[str, Any]]) -> str:
-    """Return the first city safely."""
-    cities = get_city_options(enriched_rows)
-    return cities[0] if cities else ""
 
 
 # -----------------------------
@@ -201,6 +198,7 @@ def refresh_dashboard_for_date(
     Also resets the selected risk, because risk categories can change when
     live LPG days change.
     """
+    logger.info("Refreshing dashboard for selected date: %s", selected_date_str)
     selected_date = date.fromisoformat(selected_date_str) if selected_date_str else DEFAULT_SELECTED_DATE
     enriched_rows = enrich_dashboard_rows(RAW_DF, selected_date)
     city_options = get_city_options(enriched_rows)
@@ -264,9 +262,16 @@ def refresh_top_sections(
 )
 def select_city_from_region_card(
     clicks: list[int | None],
-    ids: list[dict[str, str]],
+    __: list[dict[str, str]],
 ) -> tuple[str, str]:
     """Set selected city based on which region card was clicked."""
+    logger.debug("Region card click callback triggered")
+
+    # Guard against callback noise when region card components are re-rendered
+    # (for example on risk selection). Only proceed on a real click event.
+    if not clicks or all((value or 0) <= 0 for value in clicks):
+        raise PreventUpdate
+
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -288,7 +293,7 @@ def select_city_from_region_card(
     prevent_initial_call=True,
 )
 def select_risk_category(
-    clicks: list[int | None],
+    _: list[int | None],
     current_risk: str,
 ) -> str:
     """Toggle selected risk category from executive cards."""
@@ -301,7 +306,9 @@ def select_risk_category(
         raise PreventUpdate
 
     clicked_risk = str(trigger["index"])
-    return "" if current_risk == clicked_risk else clicked_risk
+    next_risk = "" if current_risk == clicked_risk else clicked_risk
+    logger.info("Risk selection changed from %s to %s", current_risk, next_risk)
+    return next_risk
 
 
 # -----------------------------
@@ -315,7 +322,9 @@ def select_risk_category(
 def sync_search_text(search_values: list[str | None]) -> str:
     if not search_values:
         return ""
-    return str(search_values[-1] or "").strip()
+    search_text = str(search_values[-1] or "").strip()
+    logger.debug("Pivot search updated: %s", search_text)
+    return search_text
 
 
 # -----------------------------
@@ -339,6 +348,7 @@ def refresh_pivot_section(
     Otherwise show a compact prompt.
     """
     if not selected_risk:
+        logger.debug("Pivot hidden until risk is selected")
         return build_empty_pivot_state()
 
     pivot_groups = build_client_pivot_groups(
