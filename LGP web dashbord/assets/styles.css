@@ -510,6 +510,7 @@ button {
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 15px;
+  white-space: nowrap;
 }
 
 .executive-risk-underline {
