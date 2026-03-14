@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 
@@ -88,16 +89,10 @@ def working_days_between(last_updated: date, selected_date: date) -> int:
     if selected_date <= last_updated:
         return 0
 
-    cursor = pd.Timestamp(last_updated) + pd.Timedelta(days=1)
-    end = pd.Timestamp(selected_date)
-    count = 0
-
-    while cursor < end:
-        if not is_weekend(cursor.date()):
-            count += 1
-        cursor += pd.Timedelta(days=1)
-
-    return count
+    # Count weekdays in [last_updated + 1 day, selected_date) efficiently.
+    start = np.datetime64(last_updated + pd.Timedelta(days=1), "D")
+    end = np.datetime64(selected_date, "D")
+    return int(np.busday_count(start, end))
 
 
 def get_live_days(days_of_stock: float | int, last_updated: date, selected_date: date) -> int:
